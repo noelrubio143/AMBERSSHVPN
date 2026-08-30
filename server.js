@@ -76,14 +76,16 @@ app.post('/create-payment', async (req, res) => {
       return res.status(400).json({ error: 'Amount must be at least PHP 1.00' });
     }
 
-    // Create Payment Intent using the NEW API
-    const response = await axios.post(
+    // Step 1: Create the Payment Intent, allowing QR Ph (this is what
+    // actually generates a scannable QR image — 'gcash' by itself is
+    // a redirect-to-checkout-page method, not an in-app QR).
+    const intentResponse = await axios.post(
       'https://api.paymongo.com/v1/payment_intents',
       {
         data: {
           attributes: {
             amount: SUBSCRIPTION_PRICE_CENTAVOS,
-            payment_method_allowed: ['gcash'], // QRPh is GCash QR
+            payment_method_allowed: ['qrph'],
             currency: 'PHP',
             description: `AMBERSSHVPN subscription for user ${userId}`,
             statement_descriptor: 'AMBERSSHVPN',
@@ -99,15 +101,62 @@ app.post('/create-payment', async (req, res) => {
       }
     );
 
-    const paymentIntentId = response.data.data.id;
-    const paymentIntentStatus = response.data.data.attributes.status;
-    
-    // Get the QR code image from next_action if available
-    let qrCodeImage = null;
-    const nextAction = response.data.data.attributes.next_action;
-    if (nextAction && nextAction.type === 'redirect') {
-      qrCodeImage = nextAction.data?.image_url; // Base64 encoded image
-    }
+    const paymentIntentId = intentResponse.data.data.id;
+    const clientKey = intentResponse.data.data.attributes.client_key;
+
+    // Step 2: Create a QR Ph Payment Method. Billing name/email/address
+    // are required by PayMongo even though we don't otherwise collect
+    // them from users of the app — placeholders are fine here since
+    // they don't affect where the money settles.
+    const methodResponse = await axios.post(
+      'https://api.paymongo.com/v1/payment_methods',
+      {
+        data: {
+          attributes: {
+            type: 'qrph',
+            billing: {
+              name: `AMBERSSHVPN User ${userId}`,
+              email: `${userId}@amberssh.app`,
+              address: {
+                line1: 'N/A',
+                city: 'Manila',
+                state: 'Metro Manila',
+                postal_code: '1000',
+                country: 'PH',
+              },
+            },
+          },
+        },
+      },
+      {
+        auth: { username: PAYMONGO_SECRET_KEY, password: '' },
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    const paymentMethodId = methodResponse.data.data.id;
+
+    // Step 3: Attach the Payment Method to the Payment Intent. The QR
+    // image only appears in THIS response, under next_action.code.image_url.
+    const attachResponse = await axios.post(
+      `https://api.paymongo.com/v1/payment_intents/${paymentIntentId}/attach`,
+      {
+        data: {
+          attributes: {
+            payment_method: paymentMethodId,
+            client_key: clientKey,
+          },
+        },
+      },
+      {
+        auth: { username: PAYMONGO_SECRET_KEY, password: '' },
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    const paymentIntentStatus = attachResponse.data.data.attributes.status;
+    const nextAction = attachResponse.data.data.attributes.next_action;
+    const qrCodeImage = nextAction?.code?.image_url || null; // Base64 data URI
 
     // Record as pending so the webhook can look up which user paid.
     await db.collection('pendingPayments').doc(paymentIntentId).set({
@@ -115,7 +164,7 @@ app.post('/create-payment', async (req, res) => {
       status: 'pending',
       paymentIntentId,
       amount: SUBSCRIPTION_PRICE_CENTAVOS,
-      paymentMethod: 'gcash',
+      paymentMethod: 'qrph',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -125,7 +174,7 @@ app.post('/create-payment', async (req, res) => {
     res.json({ 
       paymentIntentId, 
       status: paymentIntentStatus,
-      qrCodeImage, // Can be rendered directly or sent to frontend
+      qrCodeImage, // data:image/png;base64,... — render directly as an <img src> or decode on the app side
     });
   } catch (err) {
     console.error('create-payment error:', err.response?.data || err.message);

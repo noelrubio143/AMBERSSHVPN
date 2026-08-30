@@ -1,0 +1,19 @@
+{
+  "name": "amber-payment-backend",
+  "version": "1.0.0",
+  "description": "PayMongo QRPh payment backend for AMBERSSH VPN - grants 1 month subscription on successful payment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.2",
+    "firebase-admin": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

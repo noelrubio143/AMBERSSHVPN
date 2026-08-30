@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebase-admin';
 // paid-subscription flow for anyone else; it's just an early-return before
 // the Firestore lookup.
 const ADMIN_USER_IDS = [
-  'b7869ae7-1595-41eb-8c11-08b4e8384b93',
+  'e94152b3-056e-4957-916b-ba034ed4fe3f',
 ];
 
 export async function GET(req, { params }) {

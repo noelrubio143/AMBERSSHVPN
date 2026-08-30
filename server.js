@@ -246,6 +246,39 @@ app.get('/check-payment/:id', async (req, res) => {
 });
 
 // ---------------------------------------------------------------
+// GET /user-status/:userId
+// Called by the app before letting the user connect to the VPN.
+// Returns: { isPremium, subscriptionExpiry, active }
+// "active" is the one field the app actually needs to check —
+// true only when isPremium is set AND subscriptionExpiry hasn't
+// passed yet.
+// ---------------------------------------------------------------
+app.get('/user-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const userSnap = await db.collection('users').doc(userId).get();
+
+    if (!userSnap.exists) {
+      return res.json({ isPremium: false, subscriptionExpiry: null, active: false });
+    }
+
+    const data = userSnap.data();
+    const isPremium = !!data.isPremium;
+    const expiryDate = data.subscriptionExpiry ? data.subscriptionExpiry.toDate() : null;
+    const active = isPremium && expiryDate !== null && expiryDate > new Date();
+
+    res.json({
+      isPremium,
+      subscriptionExpiry: expiryDate ? expiryDate.toISOString() : null,
+      active,
+    });
+  } catch (err) {
+    console.error('user-status error:', err.message);
+    res.status(500).json({ error: 'Failed to check user status' });
+  }
+});
+
+// ---------------------------------------------------------------
 // GET /health - simple check so Render's health check (and you)
 // can confirm the service is alive.
 // ---------------------------------------------------------------

@@ -316,23 +316,23 @@ async function handleSourceChargeable(payload) {
 }
 
 /**
- * OLD HANDLER: Payment Paid (for backward compatibility)
- * Some PayMongo flows send payment.paid directly instead of (or in
- * addition to) source.chargeable. Handle it defensively too.
+ * HANDLER: Payment Paid
+ * This is the event PayMongo actually sends for QR Ph once the
+ * customer completes the scan-and-pay flow. The Payment resource's
+ * payment_intent_id is what we stored as the pendingPayments doc ID
+ * back in /create-payment — that's the correct lookup key, NOT
+ * attributes.source.id (which for QR Ph is a "qrph_..." id, never
+ * the "pi_..." id we saved).
  */
 async function handlePaymentPaid(payload) {
   const paymentObj = payload.data.attributes.data;
-  const sourceId = paymentObj?.attributes?.source?.id;
-  if (!sourceId) return;
-
-  // Avoid double-granting if source.chargeable already handled it.
-  const pendingDoc = await db.collection('pendingPayments').doc(sourceId).get();
-  if (pendingDoc.exists && pendingDoc.data().status === 'completed') {
-    console.log(`Source ${sourceId} already completed, skipping duplicate grant.`);
+  const paymentIntentId = paymentObj?.attributes?.payment_intent_id;
+  if (!paymentIntentId) {
+    console.error('payment.paid webhook missing payment_intent_id:', JSON.stringify(paymentObj));
     return;
   }
 
-  await grantOneMonth(sourceId, paymentObj.id);
+  await grantOneMonth(paymentIntentId, null);
 }
 
 /**

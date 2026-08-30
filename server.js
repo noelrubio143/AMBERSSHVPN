@@ -134,6 +134,69 @@ app.post('/create-payment', async (req, res) => {
 });
 
 // ---------------------------------------------------------------
+// GET /check-payment/:id
+// Polled by the app while the QR code is on screen, using the
+// paymentIntentId returned from /create-payment.
+//
+// It checks TWO things:
+//   1. Our own Firestore record (pendingPayments/<id>) — this is
+//      the source of truth for whether the subscription was
+//      actually granted, since that only happens once the
+//      /webhook route fires and grantOneMonth() runs.
+//   2. The live PayMongo payment_intent status — useful to show
+//      the user "waiting for payment" vs "processing" vs failed,
+//      even before the webhook has landed.
+//
+// Returns: { paymentIntentId, paymongoStatus, granted, subscriptionExpiry }
+// ---------------------------------------------------------------
+app.get('/check-payment/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Firestore: has the webhook already granted this?
+    const pendingDoc = await db.collection('pendingPayments').doc(id).get();
+    let granted = false;
+    let userId = null;
+    let subscriptionExpiry = null;
+
+    if (pendingDoc.exists) {
+      const data = pendingDoc.data();
+      userId = data.userId;
+      granted = data.status === 'completed';
+
+      if (granted && userId) {
+        const userSnap = await db.collection('users').doc(userId).get();
+        if (userSnap.exists) {
+          const expiry = userSnap.data().subscriptionExpiry;
+          subscriptionExpiry = expiry ? expiry.toDate().toISOString() : null;
+        }
+      }
+    }
+
+    // 2. PayMongo: live status of the payment intent itself.
+    let paymongoStatus = 'unknown';
+    try {
+      const response = await axios.get(
+        `https://api.paymongo.com/v1/payment_intents/${id}`,
+        { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
+      );
+      paymongoStatus = response.data.data.attributes.status;
+    } catch (paymongoErr) {
+      console.error('check-payment paymongo lookup error:', paymongoErr.response?.data || paymongoErr.message);
+    }
+
+    res.json({
+      paymentIntentId: id,
+      paymongoStatus,   // e.g. "awaiting_payment_method", "processing", "succeeded"
+      granted,          // true only once our webhook has actually extended the subscription
+      subscriptionExpiry,
+    });
+  } catch (err) {
+    console.error('check-payment error:', err.message);
+    res.status(500).json({ error: 'Failed to check payment status' });
+  }
+});
+
+// ---------------------------------------------------------------
 // GET /health - simple check so Render's health check (and you)
 // can confirm the service is alive.
 // ---------------------------------------------------------------

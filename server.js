@@ -6,25 +6,30 @@ const cors = require('cors');
 
 const app = express();
 
-// ---------------------------------------------------------------
-// Firebase Admin SDK setup
-// The service account JSON is stored as a single environment
-// variable (FIREBASE_SERVICE_ACCOUNT) containing the full JSON
-// text, so no key file needs to be committed to the repo.
-// ---------------------------------------------------------------
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// ===== FIREBASE SETUP =====
+// Read individual env vars instead of JSON string
+const serviceAccount = {
+  type: "service_account",
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+};
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 const db = admin.firestore();
 
+// ===== PAYMONGO CONFIG =====
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
-const SUBSCRIPTION_PRICE_CENTAVOS = parseInt(process.env.SUBSCRIPTION_PRICE_CENTAVOS || '9900', 10); // default P99.00
-const SUCCESS_REDIRECT_URL = process.env.SUCCESS_REDIRECT_URL || 'https://noelrubio143.github.io/AMBERSSHVPN/payment-success.html';
-const FAILED_REDIRECT_URL = process.env.FAILED_REDIRECT_URL || 'https://noelrubio143.github.io/AMBERSSHVPN/payment-failed.html';
+const SUBSCRIPTION_PRICE_CENTAVOS = parseInt(process.env.SUBSCRIPTION_PRICE_CENTAVOS || '9900', 10);
 
-// Webhook route needs the RAW body (for signature verification),
-// so it must be registered BEFORE the global json() body parser.
+// ===== WEBHOOK (needs raw body) =====
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     const payload = JSON.parse(req.body.toString());
@@ -32,38 +37,29 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
     console.log('Webhook received:', eventType);
 
-    // New Payment Intents flow
     if (eventType === 'payment_intent.succeeded') {
       await handlePaymentIntentSucceeded(payload);
-    } else if (eventType === 'payment_intent.payment_initiated') {
-      // Optional: Log when payment is initiated but not yet completed
-      console.log('Payment initiated for intent:', payload.data.id);
-    }
-    // Keep old handlers for backward compatibility if needed
-    else if (eventType === 'source.chargeable') {
-      await handleSourceChargeable(payload);
     } else if (eventType === 'payment.paid') {
       await handlePaymentPaid(payload);
     }
 
-    // Always acknowledge quickly so PayMongo doesn't retry unnecessarily.
     res.status(200).send('OK');
   } catch (err) {
     console.error('Webhook error:', err.message);
-    res.status(200).send('OK'); // still 200 so PayMongo doesn't hammer retries; log for manual review
+    res.status(200).send('OK');
   }
 });
 
-// Normal JSON body parser for all other routes.
+// ===== BODY PARSER & CORS =====
 app.use(express.json());
 app.use(cors());
 
-// ---------------------------------------------------------------
-// POST /create-payment
-// Called from the app when the user taps "Subscribe".
-// Body: { userId: "<firebase uid>" }
-// Returns: { paymentIntentId, qrCodeImage }
-// ---------------------------------------------------------------
+// ===== HEALTH CHECK =====
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// ===== CREATE PAYMENT =====
 app.post('/create-payment', async (req, res) => {
   try {
     const { userId } = req.body;
@@ -71,14 +67,11 @@ app.post('/create-payment', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    // Minimum amount check for QRPh (PHP 1.00 = 100 centavos)
     if (SUBSCRIPTION_PRICE_CENTAVOS < 100) {
       return res.status(400).json({ error: 'Amount must be at least PHP 1.00' });
     }
 
-    // Step 1: Create the Payment Intent, allowing QR Ph (this is what
-    // actually generates a scannable QR image — 'gcash' by itself is
-    // a redirect-to-checkout-page method, not an in-app QR).
+    // Step 1: Create Payment Intent
     const intentResponse = await axios.post(
       'https://api.paymongo.com/v1/payment_intents',
       {
@@ -87,27 +80,19 @@ app.post('/create-payment', async (req, res) => {
             amount: SUBSCRIPTION_PRICE_CENTAVOS,
             payment_method_allowed: ['qrph'],
             currency: 'PHP',
-            description: `AMBERSSHVPN subscription for user ${userId}`,
+            description: `AMBERSSHVPN subscription for ${userId}`,
             statement_descriptor: 'AMBERSSHVPN',
-            metadata: {
-              userId: userId,
-            },
+            metadata: { userId },
           },
         },
       },
-      {
-        auth: { username: PAYMONGO_SECRET_KEY, password: '' },
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
     );
 
     const paymentIntentId = intentResponse.data.data.id;
     const clientKey = intentResponse.data.data.attributes.client_key;
 
-    // Step 2: Create a QR Ph Payment Method. Billing name/email/address
-    // are required by PayMongo even though we don't otherwise collect
-    // them from users of the app — placeholders are fine here since
-    // they don't affect where the money settles.
+    // Step 2: Create Payment Method (QR Ph)
     const methodResponse = await axios.post(
       'https://api.paymongo.com/v1/payment_methods',
       {
@@ -115,7 +100,7 @@ app.post('/create-payment', async (req, res) => {
           attributes: {
             type: 'qrph',
             billing: {
-              name: `AMBERSSHVPN User ${userId}`,
+              name: `User ${userId}`,
               email: `${userId}@amberssh.app`,
               address: {
                 line1: 'N/A',
@@ -128,16 +113,12 @@ app.post('/create-payment', async (req, res) => {
           },
         },
       },
-      {
-        auth: { username: PAYMONGO_SECRET_KEY, password: '' },
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
     );
 
     const paymentMethodId = methodResponse.data.data.id;
 
-    // Step 3: Attach the Payment Method to the Payment Intent. The QR
-    // image only appears in THIS response, under next_action.code.image_url.
+    // Step 3: Attach Method to Intent (QR code appears here)
     const attachResponse = await axios.post(
       `https://api.paymongo.com/v1/payment_intents/${paymentIntentId}/attach`,
       {
@@ -148,60 +129,39 @@ app.post('/create-payment', async (req, res) => {
           },
         },
       },
-      {
-        auth: { username: PAYMONGO_SECRET_KEY, password: '' },
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
     );
 
     const paymentIntentStatus = attachResponse.data.data.attributes.status;
-    const nextAction = attachResponse.data.data.attributes.next_action;
-    const qrCodeImage = nextAction?.code?.image_url || null; // Base64 data URI
+    const qrCodeImage = attachResponse.data.data.attributes.next_action?.code?.image_url || null;
 
-    // Record as pending so the webhook can look up which user paid.
+    // Record pending payment
     await db.collection('pendingPayments').doc(paymentIntentId).set({
       userId,
       status: 'pending',
       paymentIntentId,
       amount: SUBSCRIPTION_PRICE_CENTAVOS,
-      paymentMethod: 'qrph',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log(`Payment intent created: ${paymentIntentId}, status: ${paymentIntentStatus}`);
+    console.log(`✅ Payment intent created: ${paymentIntentId}`);
 
-    // Return both the intent ID and QR code image
-    res.json({ 
-      paymentIntentId, 
+    res.json({
+      paymentIntentId,
       status: paymentIntentStatus,
-      qrCodeImage, // data:image/png;base64,... — render directly as an <img src> or decode on the app side
+      qrCodeImage,
     });
   } catch (err) {
-    console.error('create-payment error:', err.response?.data || err.message);
+    console.error('❌ create-payment error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to create payment' });
   }
 });
 
-// ---------------------------------------------------------------
-// GET /check-payment/:id
-// Polled by the app while the QR code is on screen, using the
-// paymentIntentId returned from /create-payment.
-//
-// It checks TWO things:
-//   1. Our own Firestore record (pendingPayments/<id>) — this is
-//      the source of truth for whether the subscription was
-//      actually granted, since that only happens once the
-//      /webhook route fires and grantOneMonth() runs.
-//   2. The live PayMongo payment_intent status — useful to show
-//      the user "waiting for payment" vs "processing" vs failed,
-//      even before the webhook has landed.
-//
-// Returns: { paymentIntentId, paymongoStatus, granted, subscriptionExpiry }
-// ---------------------------------------------------------------
+// ===== CHECK PAYMENT STATUS =====
 app.get('/check-payment/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // 1. Firestore: has the webhook already granted this?
+    // Check Firestore
     const pendingDoc = await db.collection('pendingPayments').doc(id).get();
     let granted = false;
     let userId = null;
@@ -215,13 +175,12 @@ app.get('/check-payment/:id', async (req, res) => {
       if (granted && userId) {
         const userSnap = await db.collection('users').doc(userId).get();
         if (userSnap.exists) {
-          const expiry = userSnap.data().subscriptionExpiry;
-          subscriptionExpiry = expiry ? expiry.toDate().toISOString() : null;
+          subscriptionExpiry = userSnap.data().subscriptionExpiry?.toDate().toISOString() || null;
         }
       }
     }
 
-    // 2. PayMongo: live status of the payment intent itself.
+    // Check PayMongo
     let paymongoStatus = 'unknown';
     try {
       const response = await axios.get(
@@ -229,30 +188,23 @@ app.get('/check-payment/:id', async (req, res) => {
         { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
       );
       paymongoStatus = response.data.data.attributes.status;
-    } catch (paymongoErr) {
-      console.error('check-payment paymongo lookup error:', paymongoErr.response?.data || paymongoErr.message);
+    } catch (err) {
+      console.error('PayMongo lookup error:', err.message);
     }
 
     res.json({
       paymentIntentId: id,
-      paymongoStatus,   // e.g. "awaiting_payment_method", "processing", "succeeded"
-      granted,          // true only once our webhook has actually extended the subscription
+      paymongoStatus,
+      granted,
       subscriptionExpiry,
     });
   } catch (err) {
-    console.error('check-payment error:', err.message);
-    res.status(500).json({ error: 'Failed to check payment status' });
+    console.error('❌ check-payment error:', err.message);
+    res.status(500).json({ error: 'Failed to check payment' });
   }
 });
 
-// ---------------------------------------------------------------
-// GET /user-status/:userId
-// Called by the app before letting the user connect to the VPN.
-// Returns: { isPremium, subscriptionExpiry, active }
-// "active" is the one field the app actually needs to check —
-// true only when isPremium is set AND subscriptionExpiry hasn't
-// passed yet.
-// ---------------------------------------------------------------
+// ===== CHECK USER STATUS =====
 app.get('/user-status/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
@@ -264,171 +216,116 @@ app.get('/user-status/:userId', async (req, res) => {
 
     const data = userSnap.data();
     const isPremium = !!data.isPremium;
-    const expiryDate = data.subscriptionExpiry ? data.subscriptionExpiry.toDate() : null;
-    const active = isPremium && expiryDate !== null && expiryDate > new Date();
+    const expiryDate = data.subscriptionExpiry?.toDate() || null;
+    const active = isPremium && expiryDate && expiryDate > new Date();
 
     res.json({
       isPremium,
-      subscriptionExpiry: expiryDate ? expiryDate.toISOString() : null,
+      subscriptionExpiry: expiryDate?.toISOString() || null,
       active,
     });
   } catch (err) {
-    console.error('user-status error:', err.message);
+    console.error('❌ user-status error:', err.message);
     res.status(500).json({ error: 'Failed to check user status' });
   }
 });
 
-// ---------------------------------------------------------------
-// GET /health - simple check so Render's health check (and you)
-// can confirm the service is alive.
-// ---------------------------------------------------------------
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
-});
+// ===== WEBHOOK HANDLERS =====
 
-// ---------------------------------------------------------------
-// Webhook handlers
-// ---------------------------------------------------------------
-
-/**
- * NEW HANDLER: Payment Intent Succeeded
- * Called when the customer successfully completed the QRPh payment.
- */
 async function handlePaymentIntentSucceeded(payload) {
   const paymentIntentId = payload.data.id;
-  const paymentIntentData = payload.data.attributes;
+  console.log(`✅ Payment succeeded: ${paymentIntentId}`);
 
-  console.log(`Payment intent succeeded: ${paymentIntentId}`);
-
-  // Look up the pending payment to get the userId
   const pendingDoc = await db.collection('pendingPayments').doc(paymentIntentId).get();
   if (!pendingDoc.exists) {
-    console.error(`No pending payment found for intent ${paymentIntentId}`);
+    console.error(`❌ No pending payment for: ${paymentIntentId}`);
     return;
   }
 
   const { userId, status } = pendingDoc.data();
-  
+
   if (status === 'completed') {
-    console.log(`Intent ${paymentIntentId} already granted, skipping.`);
+    console.log(`⚠️ Already granted: ${paymentIntentId}`);
     return;
   }
 
-  // Grant the subscription
   await grantOneMonth(paymentIntentId, userId);
 }
 
-/**
- * OLD HANDLER: Source Chargeable (for backward compatibility)
- * A QRPh/GCash-style "source" became chargeable once the user
- * completed payment in the checkout page. We now charge it.
- */
-async function handleSourceChargeable(payload) {
-  const sourceId = payload.data.attributes.data.id;
-
-  const paymentResponse = await axios.post(
-    'https://api.paymongo.com/v1/payments',
-    {
-      data: {
-        attributes: {
-          amount: SUBSCRIPTION_PRICE_CENTAVOS,
-          currency: 'PHP',
-          source: { id: sourceId, type: 'source' },
-        },
-      },
-    },
-    { auth: { username: PAYMONGO_SECRET_KEY, password: '' } }
-  );
-
-  const paymentStatus = paymentResponse.data.data.attributes.status;
-  console.log(`Payment for source ${sourceId} status: ${paymentStatus}`);
-
-  if (paymentStatus === 'paid') {
-    await grantOneMonth(sourceId, paymentResponse.data.data.id);
-  }
-}
-
-/**
- * HANDLER: Payment Paid
- * This is the event PayMongo actually sends for QR Ph once the
- * customer completes the scan-and-pay flow. The Payment resource's
- * payment_intent_id is what we stored as the pendingPayments doc ID
- * back in /create-payment — that's the correct lookup key, NOT
- * attributes.source.id (which for QR Ph is a "qrph_..." id, never
- * the "pi_..." id we saved).
- */
 async function handlePaymentPaid(payload) {
-  const paymentObj = payload.data.attributes.data;
-  const paymentIntentId = paymentObj?.attributes?.payment_intent_id;
+  const paymentIntentId = payload.data.attributes.data?.attributes?.payment_intent_id;
   if (!paymentIntentId) {
-    console.error('payment.paid webhook missing payment_intent_id:', JSON.stringify(paymentObj));
+    console.error('❌ Missing payment_intent_id in webhook');
     return;
   }
 
   await grantOneMonth(paymentIntentId, null);
 }
 
-/**
- * The actual "auto add 1 month" logic. Looks up which user this
- * payment belonged to (via pendingPayments) and extends their
- * subscriptionExpiry by 30 days from now.
- */
 async function grantOneMonth(paymentId, userId) {
-  const pendingDoc = await db.collection('pendingPayments').doc(paymentId).get();
-  if (!pendingDoc.exists) {
-    console.error(`No pending payment found for payment ${paymentId}`);
-    return;
-  }
-
-  const { userId: docUserId, status } = pendingDoc.data();
-  const finalUserId = userId || docUserId; // Use provided userId or fallback to stored
-
-  if (status === 'completed') {
-    console.log(`Payment ${paymentId} already granted, skipping.`);
-    return;
-  }
-
-  const now = new Date();
-  const oneMonthLater = new Date(now);
-  oneMonthLater.setDate(oneMonthLater.getDate() + 30);
-
-  const userRef = db.collection('users').doc(finalUserId);
-
-  await db.runTransaction(async (tx) => {
-    const userSnap = await tx.get(userRef);
-    let newExpiry = oneMonthLater;
-
-    // If the user already has time remaining, stack the new 30 days
-    // on top instead of overwriting it.
-    if (userSnap.exists) {
-      const currentExpiry = userSnap.data().subscriptionExpiry?.toDate();
-      if (currentExpiry && currentExpiry > now) {
-        newExpiry = new Date(currentExpiry);
-        newExpiry.setDate(newExpiry.getDate() + 30);
-      }
+  try {
+    const pendingDoc = await db.collection('pendingPayments').doc(paymentId).get();
+    if (!pendingDoc.exists) {
+      console.error(`❌ No pending payment: ${paymentId}`);
+      return;
     }
 
-    tx.set(
-      userRef,
-      {
-        isPremium: true,
-        subscriptionExpiry: admin.firestore.Timestamp.fromDate(newExpiry),
-        lastPaymentId: paymentId,
-        lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-  });
+    const { userId: storedUserId, status } = pendingDoc.data();
+    const finalUserId = userId || storedUserId;
 
-  await db.collection('pendingPayments').doc(paymentId).update({
-    status: 'completed',
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    if (status === 'completed') {
+      console.log(`⚠️ Already granted: ${paymentId}`);
+      return;
+    }
 
-  console.log(`Granted 1 month to user ${finalUserId}, new expiry: ${oneMonthLater.toISOString()}`);
+    // Calculate expiry
+    const now = new Date();
+    const oneMonthLater = new Date(now);
+    oneMonthLater.setDate(oneMonthLater.getDate() + 30);
+
+    const userRef = db.collection('users').doc(finalUserId);
+
+    // Transaction: update user + mark payment complete
+    await db.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      let newExpiry = oneMonthLater;
+
+      // Stack 30 days on top if user already has time
+      if (userSnap.exists) {
+        const currentExpiry = userSnap.data().subscriptionExpiry?.toDate();
+        if (currentExpiry && currentExpiry > now) {
+          newExpiry = new Date(currentExpiry);
+          newExpiry.setDate(newExpiry.getDate() + 30);
+        }
+      }
+
+      tx.set(
+        userRef,
+        {
+          isPremium: true,
+          subscriptionExpiry: admin.firestore.Timestamp.fromDate(newExpiry),
+          lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      tx.update(
+        db.collection('pendingPayments').doc(paymentId),
+        {
+          status: 'completed',
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      );
+    });
+
+    console.log(`✅ Granted 1 month to ${finalUserId}, expires: ${oneMonthLater.toISOString()}`);
+  } catch (err) {
+    console.error(`❌ grantOneMonth error:`, err.message);
+  }
 }
 
+// ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Amber payment backend running on port ${PORT}`);
+  console.log(`🚀 AMBERSSHVPN backend running on port ${PORT}`);
 });

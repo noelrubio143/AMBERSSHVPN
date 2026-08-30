@@ -1,8 +1,21 @@
 import { adminDb } from '@/lib/firebase-admin';
 
+// Device IDs that always get full access, regardless of subscriptionExpiry -
+// for the developer's own testing device(s). This does NOT touch the normal
+// paid-subscription flow for anyone else; it's just an early-return before
+// the Firestore lookup.
+const ADMIN_USER_IDS = [
+  'PASTE_YOUR_DEVICE_ID_HERE',
+];
+
 export async function GET(req, { params }) {
   try {
     const userId = params.userId;
+
+    if (ADMIN_USER_IDS.includes(userId)) {
+      return Response.json({ isPremium: true, subscriptionExpiry: null, active: true });
+    }
+
     const userDoc = await adminDb.collection('users').doc(userId).get();
 
     if (!userDoc.exists) {

@@ -1,36 +1,51 @@
-// app/api/paymongo-webhook/route.js
-// Receives PayMongo webhook events and updates the order status in Firestore.
-// Register this URL in the PayMongo Dashboard: https://your-domain.vercel.app/api/paymongo-webhook
-
 import { adminDb } from '@/lib/firebase-admin';
+import { SUBSCRIPTION_DAYS } from '@/lib/paymongo';
 
 export async function POST(req) {
   try {
     const event = await req.json();
     const eventType = event?.data?.attributes?.type;
 
-    console.log('PayMongo webhook received:', eventType);
-
     if (eventType === 'payment.paid') {
       const paymentData = event.data.attributes.data;
       const paymentIntentId = paymentData?.attributes?.payment_intent_id;
 
       if (paymentIntentId) {
-        await adminDb.collection('orders').doc(paymentIntentId).update({
-          status: 'paid',
-          paidAt: new Date().toISOString(),
-        });
+        const paymentRef = adminDb.collection('payments').doc(paymentIntentId);
+        const paymentDoc = await paymentRef.get();
+
+        if (paymentDoc.exists) {
+          const { userId } = paymentDoc.data();
+          const userRef = adminDb.collection('users').doc(userId);
+          const userDoc = await userRef.get();
+
+          const now = new Date();
+          const currentExpiry =
+            userDoc.exists && userDoc.data().subscriptionExpiry
+              ? new Date(userDoc.data().subscriptionExpiry)
+              : now;
+          const base = currentExpiry > now ? currentExpiry : now;
+          const newExpiry = new Date(base.getTime() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
+
+          await userRef.set(
+            { subscriptionExpiry: newExpiry.toISOString(), isPremium: true },
+            { merge: true }
+          );
+
+          await paymentRef.update({
+            status: 'paid',
+            granted: true,
+            paidAt: now.toISOString(),
+          });
+        }
       }
     }
 
     if (eventType === 'payment.failed') {
       const paymentData = event.data.attributes.data;
       const paymentIntentId = paymentData?.attributes?.payment_intent_id;
-
       if (paymentIntentId) {
-        await adminDb.collection('orders').doc(paymentIntentId).update({
-          status: 'failed',
-        });
+        await adminDb.collection('payments').doc(paymentIntentId).update({ status: 'failed' });
       }
     }
 

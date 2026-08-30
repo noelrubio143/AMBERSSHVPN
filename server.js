@@ -32,7 +32,15 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
     console.log('Webhook received:', eventType);
 
-    if (eventType === 'source.chargeable') {
+    // New Payment Intents flow
+    if (eventType === 'payment_intent.succeeded') {
+      await handlePaymentIntentSucceeded(payload);
+    } else if (eventType === 'payment_intent.payment_initiated') {
+      // Optional: Log when payment is initiated but not yet completed
+      console.log('Payment initiated for intent:', payload.data.id);
+    }
+    // Keep old handlers for backward compatibility if needed
+    else if (eventType === 'source.chargeable') {
       await handleSourceChargeable(payload);
     } else if (eventType === 'payment.paid') {
       await handlePaymentPaid(payload);
@@ -54,7 +62,7 @@ app.use(cors());
 // POST /create-payment
 // Called from the app when the user taps "Subscribe".
 // Body: { userId: "<firebase uid>" }
-// Returns: { checkoutUrl, sourceId }
+// Returns: { paymentIntentId, qrCodeImage }
 // ---------------------------------------------------------------
 app.post('/create-payment', async (req, res) => {
   try {
@@ -63,19 +71,25 @@ app.post('/create-payment', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    // Minimum amount check for QRPh (PHP 1.00 = 100 centavos)
+    if (SUBSCRIPTION_PRICE_CENTAVOS < 100) {
+      return res.status(400).json({ error: 'Amount must be at least PHP 1.00' });
+    }
+
+    // Create Payment Intent using the NEW API
     const response = await axios.post(
-      'https://api.paymongo.com/v1/sources',
+      'https://api.paymongo.com/v1/payment_intents',
       {
         data: {
           attributes: {
             amount: SUBSCRIPTION_PRICE_CENTAVOS,
-            redirect: {
-              success: SUCCESS_REDIRECT_URL,
-              failed: FAILED_REDIRECT_URL,
-            },
-            type: 'qrph',
+            payment_method_allowed: ['gcash'], // QRPh is GCash QR
             currency: 'PHP',
-            metadata: { userId },
+            description: `AMBERSSHVPN subscription for user ${userId}`,
+            statement_descriptor: 'AMBERSSHVPN',
+            metadata: {
+              userId: userId,
+            },
           },
         },
       },
@@ -85,18 +99,34 @@ app.post('/create-payment', async (req, res) => {
       }
     );
 
-    const sourceId = response.data.data.id;
-    const checkoutUrl = response.data.data.attributes.redirect.checkout_url;
+    const paymentIntentId = response.data.data.id;
+    const paymentIntentStatus = response.data.data.attributes.status;
+    
+    // Get the QR code image from next_action if available
+    let qrCodeImage = null;
+    const nextAction = response.data.data.attributes.next_action;
+    if (nextAction && nextAction.type === 'redirect') {
+      qrCodeImage = nextAction.data?.image_url; // Base64 encoded image
+    }
 
     // Record as pending so the webhook can look up which user paid.
-    await db.collection('pendingPayments').doc(sourceId).set({
+    await db.collection('pendingPayments').doc(paymentIntentId).set({
       userId,
       status: 'pending',
+      paymentIntentId,
       amount: SUBSCRIPTION_PRICE_CENTAVOS,
+      paymentMethod: 'gcash',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    res.json({ checkoutUrl, sourceId });
+    console.log(`Payment intent created: ${paymentIntentId}, status: ${paymentIntentStatus}`);
+
+    // Return both the intent ID and QR code image
+    res.json({ 
+      paymentIntentId, 
+      status: paymentIntentStatus,
+      qrCodeImage, // Can be rendered directly or sent to frontend
+    });
   } catch (err) {
     console.error('create-payment error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to create payment' });
@@ -116,6 +146,35 @@ app.get('/health', (req, res) => {
 // ---------------------------------------------------------------
 
 /**
+ * NEW HANDLER: Payment Intent Succeeded
+ * Called when the customer successfully completed the QRPh payment.
+ */
+async function handlePaymentIntentSucceeded(payload) {
+  const paymentIntentId = payload.data.id;
+  const paymentIntentData = payload.data.attributes;
+
+  console.log(`Payment intent succeeded: ${paymentIntentId}`);
+
+  // Look up the pending payment to get the userId
+  const pendingDoc = await db.collection('pendingPayments').doc(paymentIntentId).get();
+  if (!pendingDoc.exists) {
+    console.error(`No pending payment found for intent ${paymentIntentId}`);
+    return;
+  }
+
+  const { userId, status } = pendingDoc.data();
+  
+  if (status === 'completed') {
+    console.log(`Intent ${paymentIntentId} already granted, skipping.`);
+    return;
+  }
+
+  // Grant the subscription
+  await grantOneMonth(paymentIntentId, userId);
+}
+
+/**
+ * OLD HANDLER: Source Chargeable (for backward compatibility)
  * A QRPh/GCash-style "source" became chargeable once the user
  * completed payment in the checkout page. We now charge it.
  */
@@ -145,6 +204,7 @@ async function handleSourceChargeable(payload) {
 }
 
 /**
+ * OLD HANDLER: Payment Paid (for backward compatibility)
  * Some PayMongo flows send payment.paid directly instead of (or in
  * addition to) source.chargeable. Handle it defensively too.
  */
@@ -165,19 +225,21 @@ async function handlePaymentPaid(payload) {
 
 /**
  * The actual "auto add 1 month" logic. Looks up which user this
- * source belonged to (via pendingPayments) and extends their
+ * payment belonged to (via pendingPayments) and extends their
  * subscriptionExpiry by 30 days from now.
  */
-async function grantOneMonth(sourceId, paymentId) {
-  const pendingDoc = await db.collection('pendingPayments').doc(sourceId).get();
+async function grantOneMonth(paymentId, userId) {
+  const pendingDoc = await db.collection('pendingPayments').doc(paymentId).get();
   if (!pendingDoc.exists) {
-    console.error(`No pending payment found for source ${sourceId}`);
+    console.error(`No pending payment found for payment ${paymentId}`);
     return;
   }
 
-  const { userId, status } = pendingDoc.data();
+  const { userId: docUserId, status } = pendingDoc.data();
+  const finalUserId = userId || docUserId; // Use provided userId or fallback to stored
+
   if (status === 'completed') {
-    console.log(`Source ${sourceId} already granted, skipping.`);
+    console.log(`Payment ${paymentId} already granted, skipping.`);
     return;
   }
 
@@ -185,7 +247,7 @@ async function grantOneMonth(sourceId, paymentId) {
   const oneMonthLater = new Date(now);
   oneMonthLater.setDate(oneMonthLater.getDate() + 30);
 
-  const userRef = db.collection('users').doc(userId);
+  const userRef = db.collection('users').doc(finalUserId);
 
   await db.runTransaction(async (tx) => {
     const userSnap = await tx.get(userRef);
@@ -213,12 +275,12 @@ async function grantOneMonth(sourceId, paymentId) {
     );
   });
 
-  await db.collection('pendingPayments').doc(sourceId).update({
+  await db.collection('pendingPayments').doc(paymentId).update({
     status: 'completed',
     completedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(`Granted 1 month to user ${userId}, new expiry: ${oneMonthLater.toISOString()}`);
+  console.log(`Granted 1 month to user ${finalUserId}, new expiry: ${oneMonthLater.toISOString()}`);
 }
 
 const PORT = process.env.PORT || 3000;

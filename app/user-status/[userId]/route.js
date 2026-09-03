@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebase-admin';
 // this list anymore (requires a redeploy). Prefer setting `unlimited: true`
 // on the user's Firestore doc instead - see below, no redeploy needed.
 const ADMIN_USER_IDS = [
-  '9f617fce-9a71-48b4-95f7-3369f1119aa5',
+  'e00facfc-f906-4e3b-9562-6fad8949e8be',
 ];
 
 export async function GET(req, { params }) {

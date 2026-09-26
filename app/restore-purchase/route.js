@@ -16,7 +16,12 @@ export async function POST(req) {
       return Response.json({ error: 'Missing paymentIntentId or userId' }, { status: 400 });
     }
 
-    const paymentDoc = await adminDb.collection('payments').doc(paymentIntentId).get();
+    // QRPh/PayMongo payments live in "payments"; GCash/Maya live in "orders".
+    let paymentDoc = await adminDb.collection('payments').doc(paymentIntentId).get();
+    if (!paymentDoc.exists) {
+      paymentDoc = await adminDb.collection('orders').doc(paymentIntentId).get();
+    }
+
     if (!paymentDoc.exists) {
       return Response.json({ error: 'Receipt code not found' }, { status: 404 });
     }

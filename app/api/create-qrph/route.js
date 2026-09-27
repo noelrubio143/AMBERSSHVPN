@@ -1,28 +1,34 @@
 // app/api/create-qrph/route.js
-// POST endpoint: creates a QR Ph payment via PayMongo and logs a pending order in Firestore
+// POST endpoint: creates a QR Ph payment via PayMongo and logs a pending
+// payment record in Firestore under "payments" (this is the collection the
+// paymongo-webhook, transactions, and restore-purchase routes all read from).
 
 import { createQrphPayment } from '@/lib/paymongo';
 import { adminDb } from '@/lib/firebase-admin';
 
 export async function POST(req) {
   try {
-    const { amount, name, email, phone, address } = await req.json();
+    const { userId, amount, name, email, phone, address } = await req.json();
 
-    if (!amount || !name || !email || !address) {
+    if (!userId || !amount || !name || !email || !address) {
       return Response.json(
-        { error: 'Missing required fields: amount, name, email, address' },
+        { error: 'Missing required fields: userId, amount, name, email, address' },
         { status: 400 }
       );
     }
 
     const payment = await createQrphPayment({ amount, name, email, phone, address });
 
-    await adminDb.collection('orders').doc(payment.paymentIntentId).set({
+    // Doc ID = paymentIntentId, so the webhook can look this up directly
+    // once PayMongo reports it as paid, and grant the subscription to userId.
+    await adminDb.collection('payments').doc(payment.paymentIntentId).set({
+      userId,
       amount,
       name,
       email,
       phone: phone || null,
       status: 'pending',
+      granted: false,
       createdAt: new Date().toISOString(),
     });
 

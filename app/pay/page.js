@@ -29,6 +29,7 @@ export default function PayPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          userId,
           amount: 50,
           name: `User ${userId}`,
           email: `${userId}@amber.local`,
@@ -61,6 +62,10 @@ export default function PayPage() {
   }
 
   // Handle GCash Payment
+  // NOTE (Option B): GCash button does NOT create a separate GCash payment
+  // intent anymore. It reuses the same PayMongo QR Ph flow as the QR Ph
+  // button, since QR Ph is a universal PH QR standard that GCash's own
+  // "Scan QR" feature can read. Only the label/instructions differ.
   async function handleGCash() {
     if (!userId) {
       setError('Please enter User ID');
@@ -69,24 +74,37 @@ export default function PayPage() {
 
     setLoading(true);
     setError(null);
+    setPaymentMethod('gcash'); // controls which label/instructions render
 
     try {
-      const res = await fetch('/api/create-gcash', {
+      const res = await fetch('/api/create-qrph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({
+          userId,
+          amount: 50,
+          name: `User ${userId}`,
+          email: `${userId}@amber.local`,
+          phone: '09000000000',
+          address: {
+            line1: 'N/A',
+            city: 'N/A',
+            state: 'N/A',
+            postal_code: '0000',
+            country: 'PH',
+          },
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create GCash payment');
+        throw new Error(data.error || 'Failed to create payment');
       }
 
-      setPaymentMethod('gcash');
-      setQrImageUrl(data.qrCodeImage);
+      setQrImageUrl(data.qrImageUrl);
       setReference(data.paymentIntentId);
-      setStatus('GCash QR Code - Scan or tap to open GCash app');
+      setStatus('Buksan ang GCash app mo → Scan QR → i-scan ang code sa ibaba (QR Ph)');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -95,6 +113,9 @@ export default function PayPage() {
   }
 
   // Handle Maya Payment
+  // NOTE (Option B): same as GCash above — reuses the QR Ph payment intent
+  // instead of the separate (mock) Maya checkout session. QR Ph is readable
+  // by Maya's "Scan QR to Pay" feature too.
   async function handleMaya() {
     if (!userId) {
       setError('Please enter User ID');
@@ -103,24 +124,37 @@ export default function PayPage() {
 
     setLoading(true);
     setError(null);
+    setPaymentMethod('maya'); // controls which label/instructions render
 
     try {
-      const res = await fetch('/api/create-maya', {
+      const res = await fetch('/api/create-qrph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({
+          userId,
+          amount: 50,
+          name: `User ${userId}`,
+          email: `${userId}@amber.local`,
+          phone: '09000000000',
+          address: {
+            line1: 'N/A',
+            city: 'N/A',
+            state: 'N/A',
+            postal_code: '0000',
+            country: 'PH',
+          },
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create Maya payment');
+        throw new Error(data.error || 'Failed to create payment');
       }
 
-      setPaymentMethod('maya');
-      setCheckoutUrl(data.checkoutUrl);
+      setQrImageUrl(data.qrImageUrl);
       setReference(data.paymentIntentId);
-      setStatus('Maya Checkout - Click link to proceed');
+      setStatus('Buksan ang Maya app mo → Scan QR → i-scan ang code sa ibaba (QR Ph)');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -236,20 +270,33 @@ export default function PayPage() {
         </>
       )}
 
-      {/* QR Code Display */}
+      {/* QR Code Display (shared by QR Ph, GCash, and Maya buttons) */}
       {qrImageUrl && (
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h3>{paymentMethod === 'qrph' ? 'QR Ph Code' : paymentMethod === 'gcash' ? 'GCash QR' : 'Payment QR'}</h3>
+          <h3>
+            {paymentMethod === 'gcash'
+              ? 'Scan gamit ang GCash'
+              : paymentMethod === 'maya'
+              ? 'Scan gamit ang Maya'
+              : 'QR Ph Code'}
+          </h3>
           <img
             src={qrImageUrl}
             alt="Payment QR"
             style={{ width: '100%', maxWidth: 250, marginBottom: 16, border: '1px solid #ddd', borderRadius: 4 }}
           />
+          {(paymentMethod === 'gcash' || paymentMethod === 'maya') && (
+            <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 12 }}>
+              Isa itong QR Ph code — nababasa ng "Scan QR" feature ng {paymentMethod === 'gcash' ? 'GCash' : 'Maya'} app, kaya hindi na kailangan ng hiwalay na payment method.
+            </p>
+          )}
           <p style={{ fontSize: 12, color: '#666' }}>Reference: {reference}</p>
         </div>
       )}
 
-      {/* Maya Checkout Link */}
+      {/* Maya Checkout Link — kept for older flow; unused now that Maya
+          button reuses the QR Ph image above, but left in case checkoutUrl
+          is ever set from elsewhere. */}
       {checkoutUrl && (
         <div style={{ textAlign: 'center', marginBottom: 20, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
           <h3>Maya Checkout</h3>

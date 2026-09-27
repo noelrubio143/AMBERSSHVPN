@@ -33,11 +33,11 @@ export async function GET(req, { params }) {
     if (fromOrders) {
       const { status, granted, paymentMethod, grantedExpiry, createdAt } = data;
 
-      // Check if payment has expired (pending too long)
+      // Check if payment has expired (pending too long) — PayMongo QR Ph
+      // intents are the only flow now, treated with a 24h grace window.
       const createdTime = new Date(createdAt).getTime();
       const nowTime = Date.now();
-      const expiryHours = paymentMethod === 'gcash' ? 0.5 : 24; // GCash: 30 mins, Maya: 24 hours
-      const expiryMs = expiryHours * 60 * 60 * 1000;
+      const expiryMs = 24 * 60 * 60 * 1000;
 
       let finalStatus = status;
       if (status === 'pending' && (nowTime - createdTime) > expiryMs) {

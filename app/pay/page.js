@@ -1,6 +1,6 @@
 'use client';
 // app/pay/page.js
-// Payment page with QR Ph, GCash, and Maya options
+// Payment page with pricing tiers (1-12 months) and QR Ph, GCash, and Maya options
 
 import { useState } from 'react';
 
@@ -13,6 +13,23 @@ export default function PayPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedMonths, setSelectedMonths] = useState(null);
+
+  // Pricing tiers: 50 per month (₱50 for 1mo, ₱100 for 2mo, etc.)
+  const pricingTiers = [
+    { months: 1, price: 50 },
+    { months: 2, price: 100 },
+    { months: 3, price: 150 },
+    { months: 4, price: 200 },
+    { months: 5, price: 250 },
+    { months: 6, price: 300 },
+    { months: 7, price: 350 },
+    { months: 8, price: 400 },
+    { months: 9, price: 450 },
+    { months: 10, price: 500 },
+    { months: 11, price: 550 },
+    { months: 12, price: 600 },
+  ];
 
   // Handle QR Ph Payment
   async function handleQRPh() {
@@ -21,8 +38,15 @@ export default function PayPage() {
       return;
     }
 
+    if (!selectedMonths) {
+      setError('Please select a subscription plan');
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
+    const selectedTier = pricingTiers.find(t => t.months === selectedMonths);
 
     try {
       const res = await fetch('/api/create-qrph', {
@@ -30,7 +54,7 @@ export default function PayPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          amount: 50,
+          amount: selectedTier.price,
           name: `User ${userId}`,
           email: `${userId}@amber.local`,
           phone: '09000000000',
@@ -53,7 +77,7 @@ export default function PayPage() {
       setPaymentMethod('qrph');
       setQrImageUrl(data.qrImageUrl);
       setReference(data.paymentIntentId);
-      setStatus('Pending - Scan QR code within 10 minutes');
+      setStatus(`Scan to All eWallet - ₱${selectedTier.price} (${selectedMonths} month${selectedMonths > 1 ? 's' : ''})`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -62,19 +86,22 @@ export default function PayPage() {
   }
 
   // Handle GCash Payment
-  // NOTE (Option B): GCash button does NOT create a separate GCash payment
-  // intent anymore. It reuses the same PayMongo QR Ph flow as the QR Ph
-  // button, since QR Ph is a universal PH QR standard that GCash's own
-  // "Scan QR" feature can read. Only the label/instructions differ.
   async function handleGCash() {
     if (!userId) {
       setError('Please enter User ID');
       return;
     }
 
+    if (!selectedMonths) {
+      setError('Please select a subscription plan');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setPaymentMethod('gcash'); // controls which label/instructions render
+    setPaymentMethod('gcash');
+
+    const selectedTier = pricingTiers.find(t => t.months === selectedMonths);
 
     try {
       const res = await fetch('/api/create-qrph', {
@@ -82,7 +109,7 @@ export default function PayPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          amount: 50,
+          amount: selectedTier.price,
           name: `User ${userId}`,
           email: `${userId}@amber.local`,
           phone: '09000000000',
@@ -104,7 +131,7 @@ export default function PayPage() {
 
       setQrImageUrl(data.qrImageUrl);
       setReference(data.paymentIntentId);
-      setStatus('Buksan ang GCash app mo → Scan QR → i-scan ang code sa ibaba (QR Ph)');
+      setStatus(`Scan to GCash - ₱${selectedTier.price} (${selectedMonths} month${selectedMonths > 1 ? 's' : ''})`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -113,18 +140,22 @@ export default function PayPage() {
   }
 
   // Handle Maya Payment
-  // NOTE (Option B): same as GCash above — reuses the QR Ph payment intent
-  // instead of the separate (mock) Maya checkout session. QR Ph is readable
-  // by Maya's "Scan QR to Pay" feature too.
   async function handleMaya() {
     if (!userId) {
       setError('Please enter User ID');
       return;
     }
 
+    if (!selectedMonths) {
+      setError('Please select a subscription plan');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setPaymentMethod('maya'); // controls which label/instructions render
+    setPaymentMethod('maya');
+
+    const selectedTier = pricingTiers.find(t => t.months === selectedMonths);
 
     try {
       const res = await fetch('/api/create-qrph', {
@@ -132,7 +163,7 @@ export default function PayPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          amount: 50,
+          amount: selectedTier.price,
           name: `User ${userId}`,
           email: `${userId}@amber.local`,
           phone: '09000000000',
@@ -154,7 +185,7 @@ export default function PayPage() {
 
       setQrImageUrl(data.qrImageUrl);
       setReference(data.paymentIntentId);
-      setStatus('Buksan ang Maya app mo → Scan QR → i-scan ang code sa ibaba (QR Ph)');
+      setStatus(`Scan to Maya - ₱${selectedTier.price} (${selectedMonths} month${selectedMonths > 1 ? 's' : ''})`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -189,7 +220,7 @@ export default function PayPage() {
 
   return (
     <div style={{ maxWidth: 500, margin: '40px auto', fontFamily: 'sans-serif', padding: 20 }}>
-      <h1>💳 Payment Methods</h1>
+      <h1>💳 VPN Subscription</h1>
 
       {/* User ID Input */}
       {!paymentMethod && (
@@ -211,39 +242,83 @@ export default function PayPage() {
             }}
           />
 
+          {/* Pricing Tiers Selection */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', marginBottom: 10, fontWeight: 'bold', fontSize: 14 }}>
+              Select Subscription Duration:
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {pricingTiers.map((tier) => (
+                <button
+                  key={tier.months}
+                  onClick={() => setSelectedMonths(tier.months)}
+                  style={{
+                    padding: 12,
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    backgroundColor: selectedMonths === tier.months ? '#007AFF' : '#f0f0f0',
+                    color: selectedMonths === tier.months ? 'white' : '#333',
+                    border: selectedMonths === tier.months ? '2px solid #0051CC' : '1px solid #ddd',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  {tier.months}mo <br /> ₱{tier.price}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selected Duration Display */}
+          {selectedMonths && (
+            <div style={{
+              padding: 12,
+              backgroundColor: '#e8f4f8',
+              border: '1px solid #0066FF',
+              borderRadius: 4,
+              marginBottom: 16,
+              fontSize: 14,
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>
+              Selected: {selectedMonths} month{selectedMonths > 1 ? 's' : ''} - ₱{pricingTiers.find(t => t.months === selectedMonths)?.price}
+            </div>
+          )}
+
           {/* Payment Method Buttons */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
             <button
               onClick={handleQRPh}
-              disabled={loading || !userId}
+              disabled={loading || !userId || !selectedMonths}
               style={{
                 padding: 15,
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 'bold',
                 backgroundColor: '#007AFF',
                 color: 'white',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
-                opacity: loading || !userId ? 0.5 : 1,
+                opacity: loading || !userId || !selectedMonths ? 0.5 : 1,
               }}
             >
-              {loading && paymentMethod === 'qrph' ? '⏳' : '📱'} QR Ph
+              {loading && paymentMethod === 'qrph' ? '⏳' : '📱'} All eWallet
             </button>
 
             <button
               onClick={handleGCash}
-              disabled={loading || !userId}
+              disabled={loading || !userId || !selectedMonths}
               style={{
                 padding: 15,
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 'bold',
                 backgroundColor: '#0066FF',
                 color: 'white',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
-                opacity: loading || !userId ? 0.5 : 1,
+                opacity: loading || !userId || !selectedMonths ? 0.5 : 1,
               }}
             >
               {loading && paymentMethod === 'gcash' ? '⏳' : '💰'} GCash
@@ -251,17 +326,17 @@ export default function PayPage() {
 
             <button
               onClick={handleMaya}
-              disabled={loading || !userId}
+              disabled={loading || !userId || !selectedMonths}
               style={{
                 padding: 15,
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 'bold',
                 backgroundColor: '#FF6B00',
                 color: 'white',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
-                opacity: loading || !userId ? 0.5 : 1,
+                opacity: loading || !userId || !selectedMonths ? 0.5 : 1,
               }}
             >
               {loading && paymentMethod === 'maya' ? '⏳' : '🏦'} Maya
@@ -270,7 +345,7 @@ export default function PayPage() {
         </>
       )}
 
-      {/* QR Code Display (shared by QR Ph, GCash, and Maya buttons) */}
+      {/* QR Code Display */}
       {qrImageUrl && (
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <h3>
@@ -278,45 +353,13 @@ export default function PayPage() {
               ? 'Scan gamit ang GCash'
               : paymentMethod === 'maya'
               ? 'Scan gamit ang Maya'
-              : 'QR Ph Code'}
+              : 'All eWallet QR Code'}
           </h3>
           <img
             src={qrImageUrl}
             alt="Payment QR"
             style={{ width: '100%', maxWidth: 250, marginBottom: 16, border: '1px solid #ddd', borderRadius: 4 }}
           />
-          {(paymentMethod === 'gcash' || paymentMethod === 'maya') && (
-            <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 12 }}>
-              Isa itong QR Ph code — nababasa ng "Scan QR" feature ng {paymentMethod === 'gcash' ? 'GCash' : 'Maya'} app, kaya hindi na kailangan ng hiwalay na payment method.
-            </p>
-          )}
-          <p style={{ fontSize: 12, color: '#666' }}>Reference: {reference}</p>
-        </div>
-      )}
-
-      {/* Maya Checkout Link — kept for older flow; unused now that Maya
-          button reuses the QR Ph image above, but left in case checkoutUrl
-          is ever set from elsewhere. */}
-      {checkoutUrl && (
-        <div style={{ textAlign: 'center', marginBottom: 20, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-          <h3>Maya Checkout</h3>
-          <a
-            href={checkoutUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-block',
-              padding: '10px 20px',
-              backgroundColor: '#FF6B00',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: 4,
-              fontWeight: 'bold',
-              marginBottom: 10,
-            }}
-          >
-            Open Maya Checkout →
-          </a>
           <p style={{ fontSize: 12, color: '#666' }}>Reference: {reference}</p>
         </div>
       )}
@@ -369,6 +412,7 @@ export default function PayPage() {
             setReference(null);
             setStatus(null);
             setError(null);
+            setSelectedMonths(null);
           }}
           style={{
             display: 'block',

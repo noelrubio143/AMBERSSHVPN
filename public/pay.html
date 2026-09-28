@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amber V2Ray – Subscription</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#2a2f3a;--txt:#f2f2f2;--mut:#9aa1ad;--acc:#ff5f3f;--ok:#22c55e;--bad:#ef4444}
+@media (prefers-color-scheme:light){:root{--bg:#f6f7f9;--card:#fff;--line:#e2e5ea;--txt:#15181e;--mut:#5b6472}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.5}
+.w{max-width:520px;margin:0 auto;padding:20px}
+h1{font-size:22px;margin:4px 0 2px}.mut{color:var(--mut);font-size:13px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}
+input{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--txt);font-size:14px}
+button{cursor:pointer;font:inherit}
+.btn{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:12px;font-weight:700;width:100%}
+.btn:disabled{opacity:.5}.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:600}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.tabs{display:flex;gap:6px;margin:14px 0}.tabs button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--txt);font-weight:600}
+.tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.plans button{padding:10px 4px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--txt)}
+.plans button.on{border-color:var(--acc);background:rgba(255,95,63,.15)}
+.plans b{display:block;color:var(--acc)}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.on-p{background:rgba(34,197,94,.18);color:var(--ok)}.off-p{background:rgba(239,68,68,.18);color:var(--bad)}
+.tx{border-top:1px solid var(--line);padding:10px 0;font-size:13px}.tx:first-child{border-top:0}
+.tx .t{display:flex;justify-content:space-between;font-weight:700}
+code{font-size:12px;word-break:break-all}
+.msg{padding:10px;border-radius:10px;font-size:13px;margin-top:10px}
+.err{background:rgba(239,68,68,.15);color:var(--bad)}.okm{background:rgba(34,197,94,.15);color:var(--ok)}
+#qr img{width:100%;max-width:260px;background:#fff;padding:8px;border-radius:12px;display:block;margin:10px auto}
+.hide{display:none}a{color:var(--acc)}
+</style>
+</head>
+<body><div class="w">
+<a class="mut" href="/">← Amber V2Ray</a>
+<h1>Subscription</h1>
+<p class="mut">Same account as the app. Your Device ID is in the app: Subscription panel → copy Device ID.</p>
+
+<div class="c">
+  <input id="uid" placeholder="Device ID" autocomplete="off">
+  <button class="btn" style="margin-top:8px" id="load">Load account</button>
+  <div id="st" class="hide" style="margin-top:12px"></div>
+</div>
+
+<div class="tabs">
+  <button data-t="buy" class="on">Buy / Renew</button>
+  <button data-t="tx">Transactions</button>
+  <button data-t="rs">Restore</button>
+</div>
+
+<div id="buy" class="c">
+  <b>Choose a plan</b>
+  <div class="plans" id="plans"></div>
+  <div class="mut">Pay with</div>
+  <div class="row" style="margin-top:6px">
+    <button class="btn" data-m="All eWallet">All eWallet</button>
+    <button class="btn" data-m="GCash">GCash</button>
+    <button class="btn" data-m="Maya">Maya</button>
+  </div>
+  <div id="qr" class="hide">
+    <p id="qrlabel" style="text-align:center;font-weight:700;margin:14px 0 0"></p>
+    <div id="qrimg"></div>
+    <p class="mut" style="text-align:center;margin:0">Scan with your bank / e-wallet app, or save the QR and upload it there.</p>
+    <a id="dl" class="btn ghost" style="display:block;text-align:center;text-decoration:none;margin-top:8px" download="amber-qr.png">Save QR</a>
+    <p class="mut">Receipt code: <code id="rc"></code> <a href="#" id="cp">Copy</a></p>
+    <div id="pst" class="msg okm">Waiting for payment…</div>
+  </div>
+</div>
+
+<div id="tx" class="c hide"><div id="txl" class="mut">Load your account first.</div></div>
+
+<div id="rs" class="c hide">
+  <p class="mut" style="margin-top:0">Reinstalled or new device? Paste a receipt code from a paid transaction to restore that subscription to the Device ID above.</p>
+  <input id="rcode" placeholder="pi_xxxxxxxx" autocomplete="off">
+  <button class="btn" style="margin-top:8px" id="rbtn">Restore purchase</button>
+</div>
+
+<div id="msg"></div>
+<p class="mut">Payments are processed securely by PayMongo. Need help? noelrubios1201@gmail.com</p>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let months=null,ref=null,timer=null;
+const uid=()=>$('uid').value.trim();
+function note(t,ok){$('msg').innerHTML=t?`<div class="msg ${ok?'okm':'err'}">${esc(t)}</div>`:''}
+async function api(path,opt){const r=await fetch(path,opt);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||'Request failed ('+r.status+')');return d}
+function needId(){if(!uid()){note('Enter your Device ID first.');return true}try{localStorage.setItem('amber_uid',uid())}catch{}note('');return false}
+
+// plans
+const plans=$('plans');
+for(let m=1;m<=12;m++){const b=document.createElement('button');b.innerHTML=`${m} mo<b>₱${m*50}</b>`;b.onclick=()=>pick(m);b.dataset.m=m;plans.appendChild(b)}
+function pick(m){months=m;[...plans.children].forEach(b=>b.classList.toggle('on',+b.dataset.m===m))}
+
+// tabs
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['buy','tx','rs'].forEach(t=>$(t).classList.toggle('hide',t!==b.dataset.t));
+  if(b.dataset.t==='tx'&&uid())loadTx();
+});
+
+async function loadStatus(){
+  if(needId())return;
+  try{
+    const d=await api('/user-status/'+encodeURIComponent(uid()));
+    const life=d.active&&!d.subscriptionExpiry;
+    let html;
+    if(d.active){
+      const left=d.subscriptionExpiry?Math.max(0,Math.ceil((new Date(d.subscriptionExpiry)-Date.now())/864e5)):null;
+      html=`<span class="pill on-p">Active</span> ${life?'Lifetime access':`Expires ${esc(new Date(d.subscriptionExpiry).toLocaleDateString())} (${left} day${left===1?'':'s'} left)`}`;
+    }else html=`<span class="pill off-p">No active plan</span> <span class="mut">Choose a plan below.</span>`;
+    $('st').innerHTML=html;$('st').classList.remove('hide');
+  }catch(e){note(e.message)}
+}
+$('load').onclick=()=>{loadStatus();loadTx()};
+
+async function loadTx(){
+  if(!uid())return;
+  try{
+    const d=await api('/transactions/'+encodeURIComponent(uid()));
+    const list=d.transactions||[];
+    $('txl').innerHTML=list.length?list.map(t=>`<div class="tx"><div class="t"><span>${t.amount!=null?'₱'+Number(t.amount).toFixed(2):'-'}</span><span>${esc(t.granted?'paid ✓':t.status)}</span></div><div class="mut">${t.createdAt?esc(new Date(t.createdAt).toLocaleString()):''}</div><code>${esc(t.paymentIntentId)}</code> <a href="#" data-c="${esc(t.paymentIntentId)}">Copy</a></div>`).join(''):'No transactions yet.';
+    $('txl').querySelectorAll('a[data-c]').forEach(a=>a.onclick=e=>{e.preventDefault();navigator.clipboard?.writeText(a.dataset.c);a.textContent='Copied'});
+  }catch(e){$('txl').textContent=e.message}
+}
+
+// pay
+document.querySelectorAll('[data-m]').forEach(b=>{if(b.classList.contains('btn'))b.onclick=()=>pay(b)});
+async function pay(btn){
+  if(needId())return;
+  if(!months){note('Choose a plan first.');return}
+  const label=btn.dataset.m;btn.disabled=true;
+  try{
+    const d=await api('/create-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid(),months})});
+    if(!d.qrCodeImage)throw new Error('QR was not generated. Please try again.');
+    ref=d.paymentIntentId;
+    $('qrlabel').textContent=`Scan to ${label} - ₱${months*50} (${months} month${months>1?'s':''})`;
+    $('qrimg').innerHTML='';const img=new Image();img.alt='Payment QR';img.src=d.qrCodeImage;$('qrimg').appendChild(img);
+    $('dl').href=d.qrCodeImage;$('rc').textContent=ref;
+    $('pst').className='msg okm';$('pst').textContent='Waiting for payment…';
+    $('qr').classList.remove('hide');$('qr').scrollIntoView({behavior:'smooth'});
+    clearInterval(timer);timer=setInterval(check,4000);
+  }catch(e){note(e.message)}finally{btn.disabled=false}
+}
+async function check(){
+  if(!ref)return;
+  try{
+    const d=await api('/api/check-payment-status/'+encodeURIComponent(ref));
+    if(d.granted){clearInterval(timer);$('pst').textContent='Payment received! Your subscription is active. Reopen the app to connect.';loadStatus();loadTx()}
+    else if(['failed','expired'].includes(d.status)){clearInterval(timer);$('pst').className='msg err';$('pst').textContent='Payment '+d.status+'. Please try again.'}
+  }catch{}
+}
+$('cp').onclick=e=>{e.preventDefault();navigator.clipboard?.writeText(ref||'');$('cp').textContent='Copied'};
+
+// restore
+$('rbtn').onclick=async()=>{
+  if(needId())return;
+  const code=$('rcode').value.trim();if(!code){note('Enter a receipt code.');return}
+  try{
+    const d=await api('/restore-purchase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentIntentId:code,userId:uid()})});
+    note(d.active?'Subscription restored and active.':'Restored, but the plan has already expired.',d.active);loadStatus();
+  }catch(e){note(e.message)}
+};
+
+// init from URL / saved id
+(function(){
+  const q=new URLSearchParams(location.search);
+  const m=parseInt(q.get('months'),10);if(m>=1&&m<=12)pick(m);
+  let id=q.get('userId');try{id=id||localStorage.getItem('amber_uid')}catch{}
+  if(id){$('uid').value=id;loadStatus();loadTx()}
+})();
+</script>
+</body></html>

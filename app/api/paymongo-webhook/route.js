@@ -15,7 +15,8 @@ export async function POST(req) {
         const paymentDoc = await paymentRef.get();
 
         if (paymentDoc.exists) {
-          const { userId } = paymentDoc.data();
+          const { userId, months } = paymentDoc.data();
+          const planMonths = Number.isInteger(months) && months > 0 ? months : 1;
           const userRef = adminDb.collection('users').doc(userId);
           const userDoc = await userRef.get();
 
@@ -25,7 +26,7 @@ export async function POST(req) {
               ? new Date(userDoc.data().subscriptionExpiry)
               : now;
           const base = currentExpiry > now ? currentExpiry : now;
-          const newExpiry = new Date(base.getTime() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
+          const newExpiry = new Date(base.getTime() + planMonths * SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
 
           await userRef.set(
             { subscriptionExpiry: newExpiry.toISOString(), isPremium: true },

@@ -3,7 +3,7 @@ const nextConfig = {
   async rewrites() {
     return [
       { source: '/', destination: '/landing.html' },
-      { source: '/privacy-policy', destination: '/privacy-policy.html' },
+      { source: '/pay', destination: '/pay.html' },
     ];
   },
 };

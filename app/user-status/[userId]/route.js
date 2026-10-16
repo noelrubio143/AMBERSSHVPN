@@ -1,7 +1,8 @@
 import { adminDb } from '@/lib/firebase-admin';
-import { ADMIN_USER_IDS } from '@/lib/access';
 
-// Legacy admin device IDs live in lib/access.js (shared with game-win).
+const ADMIN_USER_IDS = [
+  '7550dd01-e223-491e-acb3-43fe8f4e3d2b',
+];
 
 export async function GET(req, { params }) {
   try {

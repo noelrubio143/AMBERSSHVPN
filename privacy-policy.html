@@ -1,135 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AMBERSSH VPN - Privacy Policy</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
-            color: #333;
-        }
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-        }
-        h2 {
-            color: #34495e;
-            margin-top: 25px;
-        }
-        .last-updated {
-            color: #7f8c8d;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        .app-info {
-            background-color: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        code {
-            background-color: #f4f4f4;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMBERSSH VPN - Privacy Policy</title>
+<style>
+  body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;background:#f4f4f4;color:#333}
+  .container{background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+  h1{color:#2c3e50;border-bottom:3px solid #c0392b;padding-bottom:10px}
+  h2{color:#34495e;margin-top:25px}
+  .last-updated{color:#7f8c8d;font-size:14px;margin-bottom:20px}
+  .app-info{background:#ecf0f1;padding:15px;border-radius:5px;margin-bottom:20px;font-size:14px}
+  code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-family:'Courier New',monospace}
+  table{border-collapse:collapse;width:100%;font-size:14px;display:block;overflow-x:auto}
+  th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}
+  th{background:#f0f0f0}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>Privacy Policy - AMBERSSH VPN</h1>
-        <p class="last-updated">Last Updated: August 2026</p>
+<div class="container">
+<h1>Privacy Policy - AMBERSSH VPN</h1>
+<p class="last-updated">Last updated: October 28, 2026</p>
 
-        <div class="app-info">
-            <strong>App Name:</strong> AMBERSSH VPN<br>
-            <strong>Package Name:</strong> <code>noelrubio143.github.io</code><br>
-            <strong>Developer:</strong> AMBERSSH VPN
-        </div>
+<div class="app-info">
+  <strong>App name:</strong> AMBERSSH VPN<br>
+  <strong>Package name:</strong> <code>amberssh.noel1201.dpdns.org</code><br>
+  <strong>Developer:</strong> Noel Rubio (AMBERSSH VPN)<br>
+  <strong>Contact:</strong> noelrubios1201@gmail.com
+</div>
 
-        <h2>1. Introduction</h2>
-        <p>AMBERSSH VPN ("we", "us", "our", "Company") operates the AMBERSSH VPN mobile application. This Privacy Policy explains how we collect, use, and protect your information when you use our Service.</p>
+<h2>1. Introduction</h2>
+<p>AMBERSSH VPN ("the app", "we", "us") is a tunneling / VPN app for Android and Fire OS. This policy explains what information the app and its related services collect, why, who receives it, and the choices you have. By using the app you agree to this policy.</p>
 
-        <h2>2. Information We Collect</h2>
-        <p>We collect the following information:</p>
-        <ul>
-            <li><strong>Device Information:</strong> Device type, OS version, app version</li>
-            <li><strong>Usage Data:</strong> Connection logs, server usage, session duration</li>
-            <li><strong>Crash Reports:</strong> Error logs and performance data</li>
-            <li><strong>Advertising Data:</strong> Google AdMob may collect advertising identifiers</li>
-        </ul>
+<h2>2. Information we collect</h2>
+<table>
+<tr><th>Data</th><th>Purpose</th><th>Where it goes</th></tr>
+<tr><td>Random app-generated device ID (a UUID created on first launch; it is not your Android ID, IMEI, phone number or e-mail)</td><td>Check subscription status, restore a purchase, show how many users are online</td><td>Our backend server and Firebase Realtime Database</td></tr>
+<tr><td>Online presence (a timestamp stored under your device ID while the app is open; removed automatically when the app disconnects)</td><td>Show the live "users online" count</td><td>Firebase Realtime Database (Google)</td></tr>
+<tr><td>Firebase Cloud Messaging token and notification settings</td><td>Deliver app notifications and announcements</td><td>Firebase Cloud Messaging (Google)</td></tr>
+<tr><td>Subscription and payment records (transaction reference, amount, status, expiry date). We do not receive or store your card or e-wallet credentials.</td><td>Activate and restore subscriptions</td><td>Our backend and the third-party payment provider that processes the payment</td></tr>
+<tr><td>Advertising data: Android Advertising ID, IP address, device and app information, and ad interaction data, collected by the Google Mobile Ads SDK (AdMob)</td><td>Show, measure and limit ads; fraud prevention; personalization where you consent</td><td>Google AdMob</td></tr>
+<tr><td>Consent choices (Google User Messaging Platform)</td><td>Remember your ad-consent choice</td><td>Stored on your device by Google's SDK</td></tr>
+</table>
+<p>The following stay <strong>only on your device</strong>: your server / config entries, usernames and passwords you type into the app, your free-time balance, and app settings. Crash information, if any, is written to local app storage and is not sent to us automatically.</p>
+<p>We do not ask for your name, e-mail, phone number, contact list, SMS, location, photos or microphone.</p>
 
-        <h2>3. How We Use Your Information</h2>
-        <ul>
-            <li>To provide and maintain our VPN service</li>
-            <li>To improve app performance and reliability</li>
-            <li>To display personalized advertisements via Google AdMob</li>
-            <li>To fix technical issues and prevent fraud</li>
-        </ul>
+<h2>3. VPN / tunnel function</h2>
+<p>The app uses Android's <code>VpnService</code> only to create the tunnel you start by tapping Connect. It sets up traffic routing through the server or configuration you choose so that your device's traffic is sent through that tunnel. The app does not use this to read, modify or sell the content of your traffic. The server or network operator you connect to may have its own policies, so please only use servers you trust.</p>
 
-        <h2>4. Google AdMob</h2>
-        <p>We use Google AdMob to display advertisements. Google may collect and use data about your device and usage patterns to show relevant ads.</p>
-        <ul>
-            <li><strong>Publisher ID:</strong> ca-app-pub-6566191416931736</li>
-            <li><strong>Google Ad ID:</strong> Used for ad personalization</li>
-        </ul>
-        <p>For more information about Google's data practices, visit: <a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a></p>
-        <p>To opt out of personalized ads: <a href="https://myaccount.google.com/data-and-privacy">https://myaccount.google.com/data-and-privacy</a></p>
+<h2>4. Advertising (Google AdMob)</h2>
+<p>Users who do not have an active subscription see ads from Google AdMob: banner, interstitial, app-open and rewarded ads. Rewarded ads are optional: watching one adds free usage time (2 hours per ad, up to a stored maximum of 2 hours). Subscribers do not see ads.</p>
+<p>AdMob may use the Advertising ID and similar identifiers to serve and measure ads. In regions where consent is required (for example the EEA and the UK), the app shows a Google consent form before ads are requested, and you can change your choice later from <em>Account &rarr; Privacy &amp; ad settings</em> (press and hold the subscription status text on the home screen) when this option is shown.</p>
+<ul>
+<li>Reset or delete your advertising ID or turn off personalization in your device's Android settings (Settings &rarr; Privacy / Google &rarr; Ads).</li>
+<li>How Google uses data from apps that use its services: <a href="https://policies.google.com/technologies/partner-sites">policies.google.com/technologies/partner-sites</a></li>
+<li>Google Privacy Policy: <a href="https://policies.google.com/privacy">policies.google.com/privacy</a></li>
+</ul>
 
-        <h2>5. Data Retention</h2>
-        <ul>
-            <li>Connection logs: 30 days</li>
-            <li>Device information: Until app uninstall</li>
-            <li>Crash reports: 90 days</li>
-        </ul>
+<h2>5. Third-party services</h2>
+<ul>
+<li><strong>Google AdMob / Google Mobile Ads SDK</strong> - advertising.</li>
+<li><strong>Google User Messaging Platform</strong> - consent forms.</li>
+<li><strong>Firebase Realtime Database and Cloud Messaging</strong> - online counter and notifications (<a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>).</li>
+<li><strong>Our backend</strong> (hosted on Vercel) - subscription status and payment records.</li>
+<li><strong>Payment provider</strong> - processes subscription payments; its own privacy policy applies to the payment.</li>
+</ul>
+<p>We do not sell your personal information.</p>
 
-        <h2>6. Third-Party Services</h2>
-        <p>We use the following third-party services:</p>
-        <ul>
-            <li><strong>Google AdMob:</strong> For displaying advertisements</li>
-            <li><strong>Cloud Services:</strong> For app infrastructure and data storage</li>
-        </ul>
+<h2>6. Data retention and deletion</h2>
+<ul>
+<li>Presence entry: removed automatically when the app disconnects.</li>
+<li>Device ID, free-time balance, settings and your configs: kept on your device until you clear the app's data or uninstall the app.</li>
+<li>Subscription and payment records: kept as long as needed to provide the subscription, restore purchases and meet legal or accounting obligations.</li>
+<li>Advertising data: handled by Google under its own retention policies.</li>
+</ul>
+<p>To request access to or deletion of data linked to your device ID, e-mail us at <a href="mailto:noelrubios1201@gmail.com">noelrubios1201@gmail.com</a> with your device ID (press and hold the subscription status text in the app and choose "Copy Device ID"). We will respond within a reasonable time.</p>
 
-        <h2>7. Children's Privacy (COPPA)</h2>
-        <p>Our Service is not intended for children under 13 years old. We do not knowingly collect personal information from children under 13. If we learn that we have collected information from a child under 13, we will delete it promptly.</p>
+<h2>7. Security</h2>
+<p>Traffic sent through the app's tunnel is protected by the protocol of the configuration you choose (for example SSH, V2Ray/Xray or OpenVPN). Our backend connections use HTTPS. No method of transmission or storage is 100% secure, so we cannot guarantee absolute security.</p>
 
-        <h2>8. Security</h2>
-        <p>We implement security measures to protect your data. All VPN traffic is encrypted using AES-256. However, no method of transmission is 100% secure, and we cannot guarantee absolute security.</p>
+<h2>8. Children's privacy</h2>
+<p>The app is not directed to children under 13 and we do not knowingly collect personal information from children under 13. Ads are requested for a general audience. If you believe a child has provided us data, contact us and we will delete it.</p>
 
-        <h2>9. Your Rights</h2>
-        <p>You have the right to:</p>
-        <ul>
-            <li>Access your personal data</li>
-            <li>Request deletion of your data</li>
-            <li>Opt out of personalized advertising</li>
-            <li>Request information about data we collect</li>
-        </ul>
+<h2>9. Your rights and choices</h2>
+<ul>
+<li>Access or request deletion of data linked to your device ID (section 6).</li>
+<li>Withdraw or change ad consent in the app's privacy options, or reset your Advertising ID in Android settings.</li>
+<li>Stop all data collection by uninstalling the app.</li>
+<li>Depending on where you live (for example the EEA, UK or Philippines), you may have additional rights under local data protection law. Contact us to exercise them.</li>
+</ul>
 
-        <h2>10. Changes to This Policy</h2>
-        <p>We may update this Privacy Policy at any time. Changes will be effective upon posting to this page. Your continued use of the app constitutes acceptance of the updated policy.</p>
+<h2>10. Changes to this policy</h2>
+<p>We may update this policy. The "Last updated" date above shows the latest version. Continued use of the app after a change means you accept the updated policy.</p>
 
-        <h2>11. Contact Us</h2>
-        <p>If you have questions about this Privacy Policy, please contact us at:</p>
-        <ul>
-            <li>Email: noelrubios1201@gmail.com</li>
-            <li>App Package: noelrubio143.github.io</li>
-        </ul>
-
-        <h2>12. Compliance</h2>
-        <p>This Privacy Policy complies with Amazon Appstore Developer Agreement and Google Play Store policies, including COPPA and applicable privacy laws.</p>
-    </div>
+<h2>11. Contact</h2>
+<p>Email: <a href="mailto:noelrubios1201@gmail.com">noelrubios1201@gmail.com</a><br>
+App package: <code>amberssh.noel1201.dpdns.org</code></p>
+</div>
 </body>
 </html>

@@ -35,10 +35,9 @@
 <h2>2. Information we collect</h2>
 <table>
 <tr><th>Data</th><th>Purpose</th><th>Where it goes</th></tr>
-<tr><td>Random app-generated device ID (a UUID created on first launch; it is not your Android ID, IMEI, phone number or e-mail)</td><td>Check subscription status, restore a purchase, show how many users are online</td><td>Our backend server and Firebase Realtime Database</td></tr>
+<tr><td>Random app-generated device ID (a UUID created on first launch; it is not your Android ID, IMEI, phone number or e-mail)</td><td>Show how many users are online and identify your device if you ask us to delete data</td><td>Firebase Realtime Database (Google)</td></tr>
 <tr><td>Online presence (a timestamp stored under your device ID while the app is open; removed automatically when the app disconnects)</td><td>Show the live "users online" count</td><td>Firebase Realtime Database (Google)</td></tr>
 <tr><td>Firebase Cloud Messaging token and notification settings</td><td>Deliver app notifications and announcements</td><td>Firebase Cloud Messaging (Google)</td></tr>
-<tr><td>Subscription and payment records (transaction reference, amount, status, expiry date). We do not receive or store your card or e-wallet credentials.</td><td>Activate and restore subscriptions</td><td>Our backend and the third-party payment provider that processes the payment</td></tr>
 <tr><td>Advertising data: Android Advertising ID, IP address, device and app information, and ad interaction data, collected by the Google Mobile Ads SDK (AdMob)</td><td>Show, measure and limit ads; fraud prevention; personalization where you consent</td><td>Google AdMob</td></tr>
 <tr><td>Consent choices (Google User Messaging Platform)</td><td>Remember your ad-consent choice</td><td>Stored on your device by Google's SDK</td></tr>
 </table>
@@ -49,8 +48,8 @@
 <p>The app uses Android's <code>VpnService</code> only to create the tunnel you start by tapping Connect. It sets up traffic routing through the server or configuration you choose so that your device's traffic is sent through that tunnel. The app does not use this to read, modify or sell the content of your traffic. The server or network operator you connect to may have its own policies, so please only use servers you trust.</p>
 
 <h2>4. Advertising (Google AdMob)</h2>
-<p>Users who do not have an active subscription see ads from Google AdMob: banner, interstitial, app-open and rewarded ads. Rewarded ads are optional: watching one adds free usage time (2 hours per ad, up to a stored maximum of 2 hours). Subscribers do not see ads.</p>
-<p>AdMob may use the Advertising ID and similar identifiers to serve and measure ads. In regions where consent is required (for example the EEA and the UK), the app shows a Google consent form before ads are requested, and you can change your choice later from <em>Account &rarr; Privacy &amp; ad settings</em> (press and hold the subscription status text on the home screen) when this option is shown.</p>
+<p>The app is free. It shows ads from Google AdMob: banner, interstitial, app-open and rewarded ads. Free VPN time is earned by watching a rewarded ad (2 hours per ad, up to a stored maximum of 2 hours). The app has no subscriptions, purchases or payments.</p>
+<p>AdMob may use the Advertising ID and similar identifiers to serve and measure ads. In regions where consent is required (for example the EEA and the UK), the app shows a Google consent form before ads are requested, and you can change your choice later from <em>Account &rarr; Privacy &amp; ad settings</em> (press and hold the free-time text on the home screen) when this option is shown.</p>
 <ul>
 <li>Reset or delete your advertising ID or turn off personalization in your device's Android settings (Settings &rarr; Privacy / Google &rarr; Ads).</li>
 <li>How Google uses data from apps that use its services: <a href="https://policies.google.com/technologies/partner-sites">policies.google.com/technologies/partner-sites</a></li>
@@ -62,8 +61,6 @@
 <li><strong>Google AdMob / Google Mobile Ads SDK</strong> - advertising.</li>
 <li><strong>Google User Messaging Platform</strong> - consent forms.</li>
 <li><strong>Firebase Realtime Database and Cloud Messaging</strong> - online counter and notifications (<a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>).</li>
-<li><strong>Our backend</strong> (hosted on Vercel) - subscription status and payment records.</li>
-<li><strong>Payment provider</strong> - processes subscription payments; its own privacy policy applies to the payment.</li>
 </ul>
 <p>We do not sell your personal information.</p>
 
@@ -71,13 +68,12 @@
 <ul>
 <li>Presence entry: removed automatically when the app disconnects.</li>
 <li>Device ID, free-time balance, settings and your configs: kept on your device until you clear the app's data or uninstall the app.</li>
-<li>Subscription and payment records: kept as long as needed to provide the subscription, restore purchases and meet legal or accounting obligations.</li>
 <li>Advertising data: handled by Google under its own retention policies.</li>
 </ul>
-<p>To request access to or deletion of data linked to your device ID, e-mail us at <a href="mailto:noelrubios1201@gmail.com">noelrubios1201@gmail.com</a> with your device ID (press and hold the subscription status text in the app and choose "Copy Device ID"). We will respond within a reasonable time.</p>
+<p>To request access to or deletion of data linked to your device ID, e-mail us at <a href="mailto:noelrubios1201@gmail.com">noelrubios1201@gmail.com</a> with your device ID (press and hold the free-time text in the app and choose "Copy Device ID"). We will respond within a reasonable time.</p>
 
 <h2>7. Security</h2>
-<p>Traffic sent through the app's tunnel is protected by the protocol of the configuration you choose (for example SSH, V2Ray/Xray or OpenVPN). Our backend connections use HTTPS. No method of transmission or storage is 100% secure, so we cannot guarantee absolute security.</p>
+<p>Traffic sent through the app's tunnel is protected by the protocol of the configuration you choose (for example SSH, V2Ray/Xray or OpenVPN). Connections to Google and Firebase services use HTTPS. No method of transmission or storage is 100% secure, so we cannot guarantee absolute security.</p>
 
 <h2>8. Children's privacy</h2>
 <p>The app is not directed to children under 13 and we do not knowingly collect personal information from children under 13. Ads are requested for a general audience. If you believe a child has provided us data, contact us and we will delete it.</p>
